@@ -136,6 +136,26 @@ The project deploys as two Railway services:
 
 The bot server exposes a `GET /health` endpoint for Railway health checks.
 
+## Jira Integration (Optional)
+
+The bot can automatically create Jira Cloud issues for every triaged message. To enable, set these environment variables:
+
+| Variable | Description |
+|---|---|
+| `JIRA_HOST` | Your Jira Cloud domain (e.g. `yourteam.atlassian.net`) |
+| `JIRA_EMAIL` | Jira account email for API authentication |
+| `JIRA_API_TOKEN` | [Jira API token](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `JIRA_PROJECT_KEY` | Project key where issues are created (e.g. `BUG`) |
+
+If any of these are missing, the bot works normally without Jira — no errors.
+
+When enabled, after each triage the bot:
+1. Creates a Jira issue with mapped fields (severity → priority, category → label, description in ADF format)
+2. Attaches the screenshot (if present) to the Jira issue
+3. Stores the Jira issue key (e.g. `BUG-42`) in the `jira_issue_key` column of the `issues` table
+
+**Database migration**: Run `supabase/migrations/002_add_jira_issue_key.sql` to add the `jira_issue_key` column.
+
 ## Privacy
 
 All messages processed by the bot are stored in **your own Supabase instance**. No data passes through any third-party service except:
