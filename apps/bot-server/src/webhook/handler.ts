@@ -112,6 +112,12 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
     // Triage via Claude
     const triage = await triageMessage(combinedText, screenshotBase64, screenshotMimeType);
 
+    // Skip low-confidence messages (casual chat, irrelevant messages)
+    if (triage.confidence < 0.6) {
+      logger.info({ messageId: payload.messageId, confidence: triage.confidence, category: triage.category }, 'Low confidence triage, skipping');
+      return;
+    }
+
     // Insert into Supabase
     await insertIssue({
       waMessageId: payload.messageId,
