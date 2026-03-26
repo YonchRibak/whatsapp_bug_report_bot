@@ -2,7 +2,8 @@ import { createHmac } from 'node:crypto';
 import { type Router as RouterType, Router, type Request, type Response } from 'express';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
-import { messageExists, insertIssue } from '../storage/supabase.js';
+import { messageExists, insertIssue, updateJiraKey } from '../storage/supabase.js';
+import { createJiraIssue } from '../integrations/jira.js';
 import { uploadScreenshot } from '../storage/upload.js';
 import { extractText } from '../triage/ocr.js';
 import { triageMessage } from '../triage/classifier.js';
@@ -120,6 +121,24 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
       screenshotUrl,
       triage,
     });
+
+    // Jira integration (non-fatal)
+    try {
+      const jiraKey = await createJiraIssue({
+        title: triage.title,
+        description: triage.description ?? null,
+        steps: triage.steps_to_reproduce ?? [],
+        category: triage.category,
+        severity: triage.severity,
+        affectedFeature: triage.affected_feature ?? null,
+        screenshotUrl,
+      });
+      if (jiraKey) {
+        await updateJiraKey(payload.messageId, jiraKey);
+      }
+    } catch (error) {
+      logger.warn({ error: error instanceof Error ? error.message : error, messageId: payload.messageId, stage: 'jira' }, 'Jira integration failed');
+    }
 
     // Send reaction
     await sendReaction(payload.remoteJid, payload.messageId);

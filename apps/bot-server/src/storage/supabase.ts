@@ -42,3 +42,14 @@ export async function insertIssue(params: InsertIssueParams): Promise<void> {
     throw new Error(`Supabase insert failed: ${error.message}`);
   }
 }
+
+export async function updateJiraKey(waMessageId: string, jiraIssueKey: string): Promise<void> {
+  const { error } = await supabase
+    .from('issues')
+    .update({ jira_issue_key: jiraIssueKey })
+    .eq('wa_message_id', waMessageId);
+
+  if (error) {
+    throw new Error(`Failed to update Jira key: ${error.message}`);
+  }
+}
