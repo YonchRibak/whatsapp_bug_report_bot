@@ -102,7 +102,7 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
           combinedText = combinedText ? `${combinedText}\n\n[OCR]: ${ocrText}` : ocrText;
         }
       } catch (error) {
-        logger.error({ error, messageId: payload.messageId, stage: 'ocr' }, 'Media processing failed');
+        logger.error({ error: error instanceof Error ? error.message : error, messageId: payload.messageId, stage: 'media' }, 'Media processing failed');
         // If media processing fails entirely but we have text, continue with text only
         if (!combinedText) return;
       }
@@ -134,7 +134,7 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
       durationMs,
     }, 'Message processed successfully');
   } catch (error) {
-    logger.error({ error, messageId: payload.messageId, stage: 'triage' }, 'Pipeline error');
+    logger.error({ error: error instanceof Error ? error.message : error, messageId: payload.messageId, stage: 'pipeline' }, 'Pipeline error');
   }
 }
 
@@ -197,7 +197,7 @@ webhookRouter.post('/webhook', (req: Request, res: Response) => {
     senderName: data.pushName ?? null,
     textContent,
     hasMedia,
-    rawMessage: data,
+    rawMessage: data.message,
   }).catch(error => {
     logger.error({ error, messageId: data.key.id }, 'Unhandled pipeline error');
   });
