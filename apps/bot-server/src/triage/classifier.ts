@@ -46,6 +46,7 @@ const TRIAGE_TOOL: Anthropic.Messages.Tool = {
 export async function triageMessage(
   text: string,
   screenshotBase64?: string,
+  mimeType?: string,
 ): Promise<TriageResult> {
   const content: Anthropic.Messages.ContentBlockParam[] = [];
 
@@ -54,7 +55,7 @@ export async function triageMessage(
       type: 'image',
       source: {
         type: 'base64',
-        media_type: 'image/png',
+        media_type: (mimeType ?? 'image/png') as 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp',
         data: screenshotBase64,
       },
     });

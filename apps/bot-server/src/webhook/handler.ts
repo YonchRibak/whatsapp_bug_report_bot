@@ -83,6 +83,7 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
 
     let combinedText = payload.textContent ?? '';
     let screenshotBase64: string | undefined;
+    let screenshotMimeType: string | undefined;
     let screenshotUrl: string | null = null;
 
     // Handle media
@@ -90,6 +91,7 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
       try {
         const media = await downloadMedia(payload.rawMessage);
         screenshotBase64 = media.base64;
+        screenshotMimeType = media.mimeType;
 
         // Upload to Supabase Storage
         screenshotUrl = await uploadScreenshot(media.base64, media.mimeType);
@@ -107,7 +109,7 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
     }
 
     // Triage via Claude
-    const triage = await triageMessage(combinedText, screenshotBase64);
+    const triage = await triageMessage(combinedText, screenshotBase64, screenshotMimeType);
 
     // Insert into Supabase
     await insertIssue({
@@ -137,10 +139,9 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
 }
 
 webhookRouter.post('/webhook', (req: Request, res: Response) => {
-  // Verify HMAC signature
+  // Verify HMAC signature (skip if Evolution API doesn't send one)
   const signature = req.headers['x-webhook-signature'] as string | undefined;
-  if (!verifySignature(req.body as Buffer, signature)) {
-    // Still return 200 to avoid retries, but log warning
+  if (signature && !verifySignature(req.body as Buffer, signature)) {
     logger.warn('Invalid webhook signature');
     res.sendStatus(200);
     return;
@@ -168,8 +169,8 @@ webhookRouter.post('/webhook', (req: Request, res: Response) => {
     return;
   }
 
-  // Ignore our own messages (reactions)
-  if (data.key.fromMe) {
+  // Ignore our own messages that have no useful content (e.g. reactions)
+  if (data.key.fromMe && !data.message?.conversation && !data.message?.extendedTextMessage?.text && !data.message?.imageMessage) {
     res.sendStatus(200);
     return;
   }
