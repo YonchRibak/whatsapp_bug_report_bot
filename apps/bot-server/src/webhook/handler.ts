@@ -50,7 +50,7 @@ async function downloadMedia(rawMessage: unknown): Promise<{ base64: string; mim
       'Content-Type': 'application/json',
       apikey: config.EVOLUTION_API_KEY,
     },
-    body: JSON.stringify({ message: rawMessage }),
+    body: JSON.stringify(rawMessage),
   });
 
   if (!response.ok) {
@@ -197,7 +197,7 @@ webhookRouter.post('/webhook', (req: Request, res: Response) => {
     senderName: data.pushName ?? null,
     textContent,
     hasMedia,
-    rawMessage: data.message,
+    rawMessage: data,
   }).catch(error => {
     logger.error({ error, messageId: data.key.id }, 'Unhandled pipeline error');
   });
