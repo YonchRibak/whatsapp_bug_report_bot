@@ -28,5 +28,8 @@ Thumbs.db
 # pnpm
 .pnpm-debug.log
 
+# Supabase CLI
+supabase/.temp/
+
 # Claude
 .claude/
