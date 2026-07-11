@@ -138,21 +138,58 @@ The bot server exposes a `GET /health` endpoint for Railway health checks.
 
 ## Jira Integration (Optional)
 
-The bot can automatically create Jira Cloud issues for every triaged message. To enable, set these environment variables:
+The bot can automatically create Jira Cloud issues for every triaged message. It adapts
+to your space's schema — team-managed or company-managed — so you don't have to reshape
+your Jira to match the bot.
+
+### Connect
+
+Set the four connection variables:
 
 | Variable | Description |
 |---|---|
 | `JIRA_HOST` | Your Jira Cloud domain (e.g. `yourteam.atlassian.net`) |
 | `JIRA_EMAIL` | Jira account email for API authentication |
 | `JIRA_API_TOKEN` | [Jira API token](https://id.atlassian.com/manage-profile/security/api-tokens) |
-| `JIRA_PROJECT_KEY` | Project key where issues are created (e.g. `BUG`) |
+| `JIRA_PROJECT_KEY` | Project/space key where issues are created (e.g. `BUG`, `KAN`) |
 
-If any of these are missing, the bot works normally without Jira — no errors.
+If any are missing, the bot works normally without Jira — no errors.
+
+### Run the preflight first
+
+Before enabling, point the doctor at your space. It's read-only, verifies your
+credentials, inspects the target issue type, and prints a tailored `.env` block:
+
+```bash
+pnpm --filter bot-server jira:doctor
+```
+
+It reports whether your `Bug`/work type exists, whether Priority is available (and its
+allowed value names), where the category can go, and any required fields you must supply.
+
+### Tune the mapping (optional)
+
+Defaults work for a standard space; override any of these to match yours:
+
+| Variable | Default | Description |
+|---|---|---|
+| `JIRA_ISSUE_TYPE` | `Bug` | Work/issue type name to create |
+| `JIRA_PRIORITY_MODE` | `auto` | `auto` = send priority only if the space supports it; `on`; `off` |
+| `JIRA_PRIORITY_MAP` | `{critical:Highest,high:High,medium:Medium,low:Low}` | JSON: severity → your priority names |
+| `JIRA_CATEGORY_TARGET` | `labels` | `labels` \| `components` \| `none` \| `customfield_xxxxx` |
+| `JIRA_LABEL_PREFIX` | *(empty)* | Prefix for the category label |
+| `JIRA_EXTRA_FIELDS` | *(none)* | JSON of extra fields set on every issue (e.g. required custom fields) |
+| `JIRA_API_VERSION` | `3` | Jira REST API version |
+| `JIRA_DRY_RUN` | `false` | `true` logs the payload instead of creating an issue |
 
 When enabled, after each triage the bot:
-1. Creates a Jira issue with mapped fields (severity → priority, category → label, description in ADF format)
-2. Attaches the screenshot (if present) to the Jira issue
-3. Stores the Jira issue key (e.g. `BUG-42`) in the `jira_issue_key` column of the `issues` table
+1. Discovers the space schema once (cached) and builds a payload with only fields the space accepts
+2. Creates a Jira issue (severity → priority, category → label/component, description in ADF format)
+3. Attaches the screenshot (if present) to the Jira issue
+4. Stores the Jira issue key (e.g. `BUG-42`) in the `jira_issue_key` column of the `issues` table
+
+Field-mapping decisions and any Jira validation errors are logged (run with
+`JIRA_DRY_RUN=true` to preview payloads safely).
 
 **Database migration**: Run `supabase/migrations/002_add_jira_issue_key.sql` to add the `jira_issue_key` column.
 
