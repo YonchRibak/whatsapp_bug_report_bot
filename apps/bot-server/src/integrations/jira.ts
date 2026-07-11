@@ -1,5 +1,7 @@
 import { config } from '../config.js';
 import { logger } from '../logger.js';
+import { buildAuthHeader, discoverIssueType, type DiscoveryResult } from './jira-discovery.js';
+import { buildFields } from './jira-mapping.js';
 
 export interface CreateJiraParams {
   title: string;
@@ -10,13 +12,6 @@ export interface CreateJiraParams {
   affectedFeature: string | null;
   screenshotUrl: string | null;
 }
-
-const SEVERITY_TO_PRIORITY: Record<string, string> = {
-  critical: 'Highest',
-  high: 'High',
-  medium: 'Medium',
-  low: 'Low',
-};
 
 interface AdfNode {
   type: string;
@@ -72,10 +67,56 @@ function buildAdfDescription(description: string | null, steps: string[], affect
 
 function authHeader(): string {
   const { email, apiToken } = config.jira!;
-  return `Basic ${Buffer.from(`${email}:${apiToken}`).toString('base64')}`;
+  return buildAuthHeader(email, apiToken);
+}
+
+/**
+ * Space schema discovery, resolved once and cached for the process lifetime.
+ * A failure here is non-fatal: we fall back to null meta so mapping degrades gracefully.
+ */
+let discoveryCache: Promise<DiscoveryResult> | null = null;
+
+function getDiscovery(): Promise<DiscoveryResult> {
+  if (!config.jira) return Promise.resolve({ meta: null, availableTypes: [] });
+  if (!discoveryCache) {
+    const jira = config.jira;
+    discoveryCache = discoverIssueType(
+      { host: jira.host, auth: authHeader(), projectKey: jira.projectKey, apiVersion: jira.apiVersion },
+      jira.issueType,
+    )
+      .then((result) => {
+        if (!result.meta) {
+          logger.warn(
+            { issueType: jira.issueType, availableTypes: result.availableTypes, stage: 'jira' },
+            'Configured JIRA_ISSUE_TYPE not found in space; will send by name and let Jira validate',
+          );
+        }
+        return result;
+      })
+      .catch((error) => {
+        logger.warn(
+          { error: error instanceof Error ? error.message : error, stage: 'jira' },
+          'Jira schema discovery failed; proceeding without adaptive mapping',
+        );
+        return { meta: null, availableTypes: [] } as DiscoveryResult;
+      });
+  }
+  return discoveryCache;
+}
+
+/** Parse a failed Jira response into the structured `errors`/`errorMessages` when possible. */
+async function parseJiraError(response: Response): Promise<unknown> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text.slice(0, 500);
+  }
 }
 
 async function attachScreenshot(issueKey: string, screenshotUrl: string): Promise<void> {
+  const { host, apiVersion } = config.jira!;
+
   // Download from Supabase public URL
   const imageResponse = await fetch(screenshotUrl);
   if (!imageResponse.ok) {
@@ -87,8 +128,7 @@ async function attachScreenshot(issueKey: string, screenshotUrl: string): Promis
   const formData = new FormData();
   formData.append('file', blob, 'screenshot.png');
 
-  const { host } = config.jira!;
-  const response = await fetch(`https://${host}/rest/api/3/issue/${issueKey}/attachments`, {
+  const response = await fetch(`https://${host}/rest/api/${apiVersion}/issue/${issueKey}/attachments`, {
     method: 'POST',
     headers: {
       Authorization: authHeader(),
@@ -107,31 +147,37 @@ export async function createJiraIssue(params: CreateJiraParams): Promise<string 
   if (!config.jira) return null;
 
   try {
-    const { host, projectKey } = config.jira;
+    const jira = config.jira;
+    const { meta } = await getDiscovery();
 
-    const body = {
-      fields: {
-        project: { key: projectKey },
-        issuetype: { name: 'Bug' },
-        summary: params.title,
-        description: buildAdfDescription(params.description, params.steps, params.affectedFeature),
-        priority: { name: SEVERITY_TO_PRIORITY[params.severity] ?? 'Medium' },
-        labels: [params.category],
-      },
-    };
+    const descriptionAdf = buildAdfDescription(params.description, params.steps, params.affectedFeature);
+    const { fields, notes } = buildFields(
+      { summary: params.title, descriptionAdf, category: params.category, severity: params.severity },
+      jira,
+      meta,
+    );
 
-    const response = await fetch(`https://${host}/rest/api/3/issue`, {
+    if (notes.length > 0) {
+      logger.debug({ notes, stage: 'jira' }, 'Jira field mapping notes');
+    }
+
+    if (jira.dryRun) {
+      logger.info({ fields, stage: 'jira', dryRun: true }, 'Jira dry-run: issue NOT created (JIRA_DRY_RUN=true)');
+      return null;
+    }
+
+    const response = await fetch(`https://${jira.host}/rest/api/${jira.apiVersion}/issue`, {
       method: 'POST',
       headers: {
         Authorization: authHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ fields }),
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      logger.warn({ status: response.status, body: text, stage: 'jira' }, 'Jira issue creation failed');
+      const jiraError = await parseJiraError(response);
+      logger.warn({ status: response.status, jiraError, stage: 'jira' }, 'Jira issue creation failed');
       return null;
     }
 
