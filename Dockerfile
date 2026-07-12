@@ -1,19 +1,24 @@
 # Deterministic build for the bot-server, bypassing nixpacks (whose npm-based
-# auto-detection fought with this pnpm workspace). We pin pnpm to the version in
-# package.json's `packageManager` field and let it read the build-script approvals
-# from pnpm-workspace.yaml / package.json, so pnpm 10 does not abort on ignored builds.
+# auto-detection fought this pnpm workspace). Pin pnpm to package.json's
+# `packageManager` version and let it read build-script approvals from
+# pnpm-workspace.yaml so pnpm 10 does not abort on ignored builds.
 FROM node:20-slim
 
 WORKDIR /app
-# CI=true so pnpm runs non-interactively (frozen install, no TTY prompts).
+# CI=true so pnpm runs non-interactively (no TTY prompts).
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true
 
 # Provide pnpm 10.23.0 on PATH via corepack (bundled with Node).
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
-# Install workspace dependencies, then compile TypeScript to dist/.
-COPY . .
+# Copy manifests + lockfile first as their own layer. This guarantees the
+# lockfile is present for a frozen install and avoids reusing a stale COPY cache.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/bot-server/package.json ./apps/bot-server/
 RUN pnpm install --frozen-lockfile
+
+# Copy the rest of the source and compile TypeScript to dist/.
+COPY . .
 RUN pnpm build
 
 # Run the built server directly — no pnpm needed at runtime. Env comes from Railway.
