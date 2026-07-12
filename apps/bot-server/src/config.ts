@@ -8,7 +8,7 @@ function optionalWithDefault<T extends z.ZodTypeAny>(schema: T): z.ZodEffects<T>
 }
 
 const envSchema = z.object({
-  EVOLUTION_API_URL: z.string().url(),
+  EVOLUTION_API_URL: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v), z.string().url()),
   EVOLUTION_API_KEY: z.string().min(1),
   EVOLUTION_INSTANCE_NAME: z.string().min(1),
   TARGET_GROUP_JID: z.string().min(1),
@@ -81,9 +81,19 @@ export interface JiraConfig {
 const jiraConnected =
   parsed.JIRA_HOST && parsed.JIRA_EMAIL && parsed.JIRA_API_TOKEN && parsed.JIRA_PROJECT_KEY;
 
+/**
+ * Normalize the Jira host to a bare domain. The bot builds URLs as `https://${host}/...`,
+ * but dashboards (e.g. Railway) may auto-prepend a scheme, and users may paste a trailing
+ * slash or newline. Strip all of that so `https://yonchteam.atlassian.net/` and
+ * `yonchteam.atlassian.net` behave identically.
+ */
+function normalizeJiraHost(raw: string): string {
+  return raw.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+}
+
 const jira: JiraConfig | undefined = jiraConnected
   ? {
-      host: parsed.JIRA_HOST!,
+      host: normalizeJiraHost(parsed.JIRA_HOST!),
       email: parsed.JIRA_EMAIL!,
       apiToken: parsed.JIRA_API_TOKEN!,
       projectKey: parsed.JIRA_PROJECT_KEY!,
