@@ -1,14 +1,11 @@
 [build]
-builder = "nixpacks"
-# Invoke pnpm through corepack (bundled with Node) so the build does not depend on
-# nixpacks auto-provisioning pnpm — which it wasn't doing, causing "pnpm: command not
-# found". corepack reads the pinned version from package.json's `packageManager` field.
-buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
+# Use the repo-root Dockerfile for a deterministic build. nixpacks' npm-based
+# auto-detection conflicted with this pnpm workspace and aborted on pnpm 10's
+# ignored-build-scripts gate; the Dockerfile controls the toolchain explicitly.
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-# Run the built output directly with node — no pnpm needed at runtime. The app is
-# env-driven (no cwd-relative file reads), so running from the repo root is fine.
-startCommand = "node apps/bot-server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
