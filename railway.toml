@@ -1,9 +1,14 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm install && pnpm build"
+# Invoke pnpm through corepack (bundled with Node) so the build does not depend on
+# nixpacks auto-provisioning pnpm — which it wasn't doing, causing "pnpm: command not
+# found". corepack reads the pinned version from package.json's `packageManager` field.
+buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
 
 [deploy]
-startCommand = "pnpm start"
+# Run the built output directly with node — no pnpm needed at runtime. The app is
+# env-driven (no cwd-relative file reads), so running from the repo root is fine.
+startCommand = "node apps/bot-server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
