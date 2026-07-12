@@ -6,6 +6,9 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# Explicit start (overrides any stale service-level start command). Build context is
+# the repo root, so the compiled entry is at apps/bot-server/dist/index.js under /app.
+startCommand = "node apps/bot-server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
