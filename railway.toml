@@ -1,16 +1,11 @@
 [build]
 builder = "nixpacks"
-# Invoke pnpm through corepack (bundled with Node). --ignore-scripts skips
-# dependency build scripts (esbuild's binary is only for tsx, which we don't run;
-# protobufjs's postinstall isn't needed by the Vision client) so pnpm 10 doesn't
-# abort on its ignored-build-scripts gate. Our own `pnpm build` (tsc) still runs.
 buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
 
 [deploy]
-# nixpacks' runtime image re-copies the git source (which .gitignores dist/), so the
-# compiled output from the build phase isn't present at runtime. Make start self-
-# contained: ensure deps + a fresh dist/ exist in the runtime container, then run.
-startCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build && node apps/bot-server/dist/index.js"
+# Diagnostic start: show what's on disk, compile tsc directly (bypassing the
+# pnpm --filter wrapper) with emitted-file listing, then run.
+startCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && echo '---LS SRC---' && ls apps/bot-server/src && echo '---TSC---' && corepack pnpm -C apps/bot-server exec tsc --listEmittedFiles ; echo '---LS DIST---' && ls -la apps/bot-server/dist ; echo '---RUN---' && node apps/bot-server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
