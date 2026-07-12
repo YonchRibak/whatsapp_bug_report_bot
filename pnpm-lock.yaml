@@ -6,6 +6,8 @@ settings:
 
 importers:
 
+  .: {}
+
   apps/bot-server:
     dependencies:
       '@anthropic-ai/sdk':

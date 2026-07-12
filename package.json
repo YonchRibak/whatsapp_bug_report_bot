@@ -1,0 +1,10 @@
+{
+  "name": "whatsapp-bug-report-bot",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.23.0",
+  "scripts": {
+    "build": "pnpm --filter ./apps/bot-server build",
+    "start": "pnpm --filter ./apps/bot-server start"
+  }
+}
