@@ -15,9 +15,13 @@ export interface CreateJiraParams {
 
 interface AdfNode {
   type: string;
+  /** Present only on the top-level `doc` node. */
+  version?: number;
   attrs?: Record<string, unknown>;
   content?: AdfNode[];
   text?: string;
+  /** Inline text formatting (e.g. bold via `strong`). */
+  marks?: Array<{ type: string }>;
 }
 
 function buildAdfDescription(description: string | null, steps: string[], affectedFeature: string | null): AdfNode {
@@ -35,7 +39,7 @@ function buildAdfDescription(description: string | null, steps: string[], affect
       {
         type: 'paragraph',
         content: [
-          { type: 'text', text: 'Affected feature: ', attrs: { fontWeight: 'bold' } as never },
+          { type: 'text', text: 'Affected feature: ', marks: [{ type: 'strong' }] },
           { type: 'text', text: affectedFeature },
         ],
       },
@@ -62,7 +66,7 @@ function buildAdfDescription(description: string | null, steps: string[], affect
     content.push({ type: 'paragraph', content: [{ type: 'text', text: '(No description provided)' }] });
   }
 
-  return { type: 'doc', attrs: { version: 1 } as never, content };
+  return { type: 'doc', version: 1, content };
 }
 
 function authHeader(): string {
