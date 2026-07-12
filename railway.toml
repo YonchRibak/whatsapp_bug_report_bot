@@ -1,16 +1,16 @@
 [build]
 builder = "nixpacks"
-# Invoke pnpm through corepack (bundled with Node) so the build doesn't depend on
-# nixpacks auto-provisioning pnpm. --ignore-scripts skips dependency build scripts
-# (esbuild's native binary is only for tsx, which we don't run; protobufjs's
-# postinstall isn't needed by the Vision client) so pnpm 10 doesn't abort on its
-# ignored-build-scripts gate. Our own `pnpm build` (tsc) still runs normally.
+# Invoke pnpm through corepack (bundled with Node). --ignore-scripts skips
+# dependency build scripts (esbuild's binary is only for tsx, which we don't run;
+# protobufjs's postinstall isn't needed by the Vision client) so pnpm 10 doesn't
+# abort on its ignored-build-scripts gate. Our own `pnpm build` (tsc) still runs.
 buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
 
 [deploy]
-# Run the built output directly with node — no pnpm needed at runtime. Env comes
-# from Railway; the app has no cwd-relative file reads, so repo-root cwd is fine.
-startCommand = "node apps/bot-server/dist/index.js"
+# nixpacks' runtime image re-copies the git source (which .gitignores dist/), so the
+# compiled output from the build phase isn't present at runtime. Make start self-
+# contained: ensure deps + a fresh dist/ exist in the runtime container, then run.
+startCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build && node apps/bot-server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
