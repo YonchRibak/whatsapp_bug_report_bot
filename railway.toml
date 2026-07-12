@@ -1,16 +1,11 @@
 [build]
-builder = "nixpacks"
-# Railway's Root Directory for this service is apps/bot-server, so the build runs
-# there (flattened to /app). Invoke pnpm via corepack (bundled with Node) and skip
-# dependency build scripts so pnpm 10/11 doesn't abort on its ignored-builds gate;
-# esbuild's binary is only for tsx (unused at runtime) and protobufjs's postinstall
-# isn't needed by the Vision client. `pnpm build` here runs the bot's tsc.
-buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
+# Build with the repo Dockerfile. Railway's Root Directory for this service is
+# apps/bot-server, so the Docker build context is that folder and the compiled
+# dist/ is baked into the image (nixpacks was unreliable at carrying it).
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-# start.sh (in apps/bot-server = /app) rebuilds dist/ if the runtime image lacks it,
-# then runs the server. Railway can't parse inline shell conditionals, so use a script.
-startCommand = "sh start.sh"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
