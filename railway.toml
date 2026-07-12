@@ -8,9 +8,9 @@ builder = "nixpacks"
 buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
 
 [deploy]
-# Path is relative to /app (= apps/bot-server). dist/ is produced by the build
-# phase and carried into the runtime image (as the original deployment relied on).
-startCommand = "node dist/index.js"
+# start.sh (in apps/bot-server = /app) rebuilds dist/ if the runtime image lacks it,
+# then runs the server. Railway can't parse inline shell conditionals, so use a script.
+startCommand = "sh start.sh"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
