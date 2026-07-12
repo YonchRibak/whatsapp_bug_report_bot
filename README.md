@@ -131,10 +131,10 @@ The session persists in PostgreSQL and survives restarts — QR scanning is a on
 
 The project deploys as two Railway services:
 
-1. **evolution-api** — Docker image `atendai/evolution-api:v2-latest` with PostgreSQL and Redis plugins
-2. **bot-server** — This repo, set all `.env` vars in the Railway dashboard
+1. **evolution-api** — Docker image (`evoapicloud/evolution-api:latest`) with PostgreSQL and Redis plugins
+2. **bot-server** — this repo, built from the root `Dockerfile` (`builder = "dockerfile"` in `railway.toml`); set all environment variables in the Railway dashboard. The build context is the repo root, so the Dockerfile installs the full pnpm workspace and compiles `apps/bot-server/dist`.
 
-The bot server exposes a `GET /health` endpoint for Railway health checks.
+The bot server exposes a `GET /health` endpoint for Railway health checks and auto-deploys on push to `master`.
 
 ## Jira Integration (Optional)
 
