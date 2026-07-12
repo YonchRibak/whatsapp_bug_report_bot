@@ -49,7 +49,14 @@ interface Paginated<T> {
   maxResults?: number;
   startAt?: number;
   total?: number;
+  /**
+   * The array container key varies by endpoint: the createmeta issuetypes endpoint
+   * returns `issueTypes`, the per-type fields endpoint returns `fields`. Older/other
+   * Jira responses use the generic `values`. Callers read whichever is present.
+   */
   values?: T[];
+  issueTypes?: T[];
+  fields?: T[];
 }
 
 interface IssueTypeValue {
@@ -90,7 +97,7 @@ export async function fetchIssueTypes(ctx: DiscoveryContext): Promise<IssueTypeV
       ctx,
       `/issue/createmeta/${encodeURIComponent(ctx.projectKey)}/issuetypes?startAt=${startAt}&maxResults=50`,
     );
-    const values = data.values ?? [];
+    const values = data.issueTypes ?? data.values ?? [];
     out.push(...values.map((v) => ({ id: v.id, name: v.name })));
     startAt += values.length;
     if (values.length === 0 || (data.total !== undefined && startAt >= data.total)) break;
@@ -107,7 +114,7 @@ async function fetchIssueTypeFields(ctx: DiscoveryContext, issueTypeId: string):
       ctx,
       `/issue/createmeta/${encodeURIComponent(ctx.projectKey)}/issuetypes/${encodeURIComponent(issueTypeId)}?startAt=${startAt}&maxResults=50`,
     );
-    const values = data.values ?? [];
+    const values = data.fields ?? data.values ?? [];
     out.push(...values);
     startAt += values.length;
     if (values.length === 0 || (data.total !== undefined && startAt >= data.total)) break;
