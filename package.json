@@ -6,5 +6,8 @@
   "scripts": {
     "build": "pnpm --filter ./apps/bot-server build",
     "start": "pnpm --filter ./apps/bot-server start"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "protobufjs"]
   }
 }
