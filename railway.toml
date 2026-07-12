@@ -1,11 +1,16 @@
 [build]
 builder = "nixpacks"
+# Railway's Root Directory for this service is apps/bot-server, so the build runs
+# there (flattened to /app). Invoke pnpm via corepack (bundled with Node) and skip
+# dependency build scripts so pnpm 10/11 doesn't abort on its ignored-builds gate;
+# esbuild's binary is only for tsx (unused at runtime) and protobufjs's postinstall
+# isn't needed by the Vision client. `pnpm build` here runs the bot's tsc.
 buildCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build"
 
 [deploy]
-# Diagnostic start: show what's on disk, compile tsc directly (bypassing the
-# pnpm --filter wrapper) with emitted-file listing, then run.
-startCommand = "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && echo '---LS SRC---' && ls apps/bot-server/src && echo '---TSC---' && corepack pnpm -C apps/bot-server exec tsc --listEmittedFiles ; echo '---LS DIST---' && ls -la apps/bot-server/dist ; echo '---RUN---' && node apps/bot-server/dist/index.js"
+# Paths are relative to /app (= apps/bot-server). If the compiled dist/ wasn't
+# carried into the runtime image, rebuild it, then run.
+startCommand = "( [ -f dist/index.js ] || ( COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --ignore-scripts && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm build ) ) && node dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
