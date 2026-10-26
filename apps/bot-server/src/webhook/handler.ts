@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { type Router as RouterType, Router, type Request, type Response } from 'express';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
@@ -34,12 +34,12 @@ interface WebhookPayload {
   };
 }
 
-function verifySignature(rawBody: Buffer, signature: string | undefined): boolean {
-  if (!signature) return false;
-  const hmac = createHmac('sha256', config.WEBHOOK_SECRET);
-  hmac.update(rawBody);
-  const expected = hmac.digest('hex');
-  return signature === expected;
+/** Constant-time check of the shared secret Evolution API sends in the webhook headers. */
+function verifySecret(provided: string | undefined): boolean {
+  if (!provided) return false;
+  const expected = createHash('sha256').update(config.WEBHOOK_SECRET).digest();
+  const actual = createHash('sha256').update(provided).digest();
+  return timingSafeEqual(expected, actual);
 }
 
 async function downloadMedia(rawMessage: unknown): Promise<{ base64: string; mimeType: string }> {
@@ -164,11 +164,11 @@ async function processMessage(payload: ProcessPayload): Promise<void> {
 }
 
 webhookRouter.post('/webhook', (req: Request, res: Response) => {
-  // Verify HMAC signature (skip if Evolution API doesn't send one)
-  const signature = req.headers['x-webhook-signature'] as string | undefined;
-  if (signature && !verifySignature(req.body as Buffer, signature)) {
-    logger.warn('Invalid webhook signature');
-    res.sendStatus(200);
+  // Reject requests without the shared secret (configured in the Evolution instance's webhook headers)
+  const secret = req.headers['x-webhook-secret'] as string | undefined;
+  if (!verifySecret(secret)) {
+    logger.warn({ ip: req.ip }, 'Rejected webhook: missing or invalid secret');
+    res.sendStatus(401);
     return;
   }
 

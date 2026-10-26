@@ -112,12 +112,16 @@ curl -X POST http://localhost:8080/instance/create \
   -H "Content-Type: application/json" \
   -d '{
     "instanceName": "triage-bot",
+    "integration": "WHATSAPP-BAILEYS",
+    "qrcode": true,
     "webhook": {
+      "enabled": true,
       "url": "http://YOUR_BOT_SERVER:3000/webhook",
-      "byEvents": true,
+      "byEvents": false,
+      "base64": false,
+      "headers": { "x-webhook-secret": "YOUR_WEBHOOK_SECRET" },
       "events": ["MESSAGES_UPSERT"]
-    },
-    "webhookByEvents": true
+    }
   }'
 
 # Get QR code
